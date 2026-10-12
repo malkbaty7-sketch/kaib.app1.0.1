@@ -1,0 +1,8 @@
+{
+  "name": "كاتب",
+  "description": "تطبيق كاتب المتكامل لقراءة وحفظ واستخلاص الكتب وتأليف الكتب والأبحاث مع قاعدة بيانات Room ومكتبة كتب محفوظة",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

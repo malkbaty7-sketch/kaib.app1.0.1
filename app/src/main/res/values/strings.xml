@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">كاتب</string>
+    <string name="tab_files">المصادر</string>
+    <string name="tab_extraction">الاستخلاص</string>
+    <string name="tab_projects">المشاريع</string>
+    <string name="tab_themes">الثيمات</string>
+    <string name="tab_settings">الإعدادات</string>
+    <string name="new_project">مشروع جديد</string>
+    <string name="vip_upgrade">ترقية VIP</string>
+    <string name="analytics">التحليلات</string>
+    <string name="browser">المتصفح</string>
+    <string name="help">التعليمات والأسئلة</string>
+    <string name="admin">لوحة الإدارة</string>
+    <string name="support">الدعم الفني</string>
+    <string name="login">تسجيل الدخول</string>
+    <string name="profile">الملف الشخصي</string>
+    <string name="preflight_check">فحص التوافق والنشر</string>
+    <string name="save">حفظ</string>
+    <string name="export">تصدير</string>
+</resources>

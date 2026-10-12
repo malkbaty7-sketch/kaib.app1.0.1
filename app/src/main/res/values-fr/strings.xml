@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">كاتب</string>
+    <string name="tab_files">Sources</string>
+    <string name="tab_extraction">Extraction</string>
+    <string name="tab_projects">Projets</string>
+    <string name="tab_themes">Thèmes</string>
+    <string name="tab_settings">Paramètres</string>
+    <string name="new_project">Nouveau Projet</string>
+    <string name="vip_upgrade">Passer à VIP</string>
+    <string name="analytics">Statistiques</string>
+    <string name="browser">Navigateur</string>
+    <string name="help">Aide et FAQ</string>
+    <string name="admin">Portail Admin</string>
+    <string name="support">Support</string>
+    <string name="login">Connexion</string>
+    <string name="profile">Profil</string>
+    <string name="preflight_check">Vérification Pré-vol</string>
+    <string name="save">Enregistrer</string>
+    <string name="export">Exporter</string>
+</resources>
