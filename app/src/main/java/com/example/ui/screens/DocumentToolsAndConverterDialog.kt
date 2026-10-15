@@ -31,7 +31,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import com.example.data.model.AppThemeData
+import com.example.util.ArabicDocumentProcessor
 import com.example.util.MultiFormatDocumentEngine
 import com.example.util.OfflineDocumentConverter
 import kotlinx.coroutines.Dispatchers
@@ -49,9 +52,10 @@ fun DocumentToolsAndConverterDialog(
     onOpenConvertedDocument: ((uriString: String, fileName: String) -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
     val coroutineScope = rememberCoroutineScope()
 
-    var activeTab by remember { mutableStateOf("CONVERT") } // CONVERT, SECURITY, UTILS
+    var activeTab by remember { mutableStateOf("ARABIC_STUDIO") } // ARABIC_STUDIO, CONVERT, SECURITY, UTILS
     var selectedUri by remember { mutableStateOf<Uri?>(initialDocUri) }
     var selectedDocName by remember { mutableStateOf(initialDocName ?: "مستند") }
 
@@ -59,6 +63,13 @@ fun DocumentToolsAndConverterDialog(
     var processingStatusMessage by remember { mutableStateOf("") }
     var resultFile by remember { mutableStateOf<File?>(null) }
     var resultMessage by remember { mutableStateOf<String?>(null) }
+
+    // Arabic Studio specific states (Tashkeel, Gemini OCR, Multiple Formats)
+    var arabicTargetFormat by remember { mutableStateOf(ArabicDocumentProcessor.TargetFormat.DOCX) }
+    var arabicReadingMode by remember { mutableStateOf(ArabicDocumentProcessor.ReadingMode.AUTO) }
+    var arabicKeepLines by remember { mutableStateOf(true) }
+    var arabicExtractedPreview by remember { mutableStateOf("") }
+    var arabicProcessStatus by remember { mutableStateOf("") }
 
     // Multi-File selection for Merge
     var mergeUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
@@ -242,6 +253,7 @@ fun DocumentToolsAndConverterDialog(
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     val tabs = listOf(
+                        Pair("ARABIC_STUDIO", "✨ استخراج وتشكيل عربي"),
                         Pair("CONVERT", "⚡ تحويل الصيغ"),
                         Pair("SECURITY", "🔒 أمان وتشفير PDF"),
                         Pair("UTILS", "✂️ دمج وتقسيم وضغط")
@@ -337,6 +349,341 @@ fun DocumentToolsAndConverterDialog(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     when (activeTab) {
+                        "ARABIC_STUDIO" -> {
+                            // 1. Header description
+                            item {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = theme.primaryColor.copy(alpha = 0.08f))
+                                ) {
+                                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Icon(Icons.Default.AutoFixHigh, contentDescription = null, tint = theme.primaryColor, modifier = Modifier.size(20.dp))
+                                            Text("محوّل ومستخرج المستندات العربي المتقدم", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = theme.primaryColor)
+                                        }
+                                        Text("PDF · DOCX · TXT · صور (ممسوحة ضوئياً) مع الحفاظ التام على النص والتشكيل العربي (Harakat)", fontSize = 11.sp, color = Color.Gray)
+                                    }
+                                }
+                            }
+
+                            // 2. File picker dropzone
+                            item {
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { singlePickerLauncher.launch(arrayOf("*/*")) }
+                                        .border(2.dp, if (selectedUri != null) theme.primaryColor else Color(0xFFCBD5E1), RoundedCornerShape(14.dp)),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(18.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (selectedUri != null) Icons.Default.InsertDriveFile else Icons.Default.CloudUpload,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(34.dp),
+                                            tint = if (selectedUri != null) theme.primaryColor else Color(0xFF94A3B8)
+                                        )
+                                        Text(
+                                            text = if (selectedUri != null) selectedDocName else "اضغط هنا لاختيار مستند أو صورة",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            color = if (selectedUri != null) theme.textColor else Color(0xFF475569)
+                                        )
+                                        Text(
+                                            text = "المدعوم: PDF، DOCX، TXT، صور ممسوحة (JPG, PNG, WebP)",
+                                            fontSize = 10.sp,
+                                            color = Color.Gray
+                                        )
+                                    }
+                                }
+                            }
+
+                            // 3. Conversion Target Selector
+                            item {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text("التحويل إلى صيغة:", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = theme.textColor)
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            ArabicDocumentProcessor.TargetFormat.values().forEach { target ->
+                                                val isSel = arabicTargetFormat == target
+                                                Surface(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .clickable { arabicTargetFormat = target }
+                                                        .background(if (isSel) theme.primaryColor else Color(0xFFF1F5F9))
+                                                        .padding(vertical = 8.dp),
+                                                    color = Color.Transparent
+                                                ) {
+                                                    Text(
+                                                        text = target.displayName,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                                                        color = if (isSel) Color.White else Color(0xFF334155),
+                                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 4. Reading Mode Selector (طريقة القراءة)
+                            item {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text("طريقة القراءة والمعالجة:", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = theme.textColor)
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            val modes = listOf(
+                                                Pair(ArabicDocumentProcessor.ReadingMode.AUTO, "تلقائي (مباشر وOCR)"),
+                                                Pair(ArabicDocumentProcessor.ReadingMode.AI, "ذكاء اصطناعي دائماً (OCR)")
+                                            )
+                                            modes.forEach { (m, label) ->
+                                                val isSel = arabicReadingMode == m
+                                                Surface(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .clickable { arabicReadingMode = m }
+                                                        .background(if (isSel) theme.primaryColor else Color(0xFFF1F5F9))
+                                                        .padding(vertical = 8.dp, horizontal = 4.dp),
+                                                    color = Color.Transparent
+                                                ) {
+                                                    Text(
+                                                        text = label,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                                                        color = if (isSel) Color.White else Color(0xFF334155),
+                                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                                        maxLines = 1
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 5. Checkbox (الحفاظ على الأسطر كما في الأصل)
+                            item {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { arabicKeepLines = !arabicKeepLines }
+                                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Checkbox(
+                                            checked = arabicKeepLines,
+                                            onCheckedChange = { arabicKeepLines = it }
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Column {
+                                            Text("الحفاظ على الأسطر كما في الأصل", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = theme.textColor)
+                                            Text("للحفاظ على فواصل الأسطر والترتيب الدقيق للشعر والقوائم والعناوين", fontSize = 10.sp, color = Color.Gray)
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 6. Action Button
+                            item {
+                                Button(
+                                    onClick = {
+                                        if (selectedUri == null) {
+                                            Toast.makeText(context, "الرجاء اختيار ملف أولاً", Toast.LENGTH_SHORT).show()
+                                            return@Button
+                                        }
+                                        coroutineScope.launch {
+                                            isProcessing = true
+                                            arabicProcessStatus = "جاري قراءة الملف..."
+                                            processingStatusMessage = "جاري فحص وقراءة الملف..."
+                                            val res = ArabicDocumentProcessor.processAndConvert(
+                                                context = context,
+                                                fileUri = selectedUri!!,
+                                                fileName = selectedDocName,
+                                                targetFormat = arabicTargetFormat,
+                                                readingMode = arabicReadingMode,
+                                                keepLines = arabicKeepLines,
+                                                onProgress = { st ->
+                                                    arabicProcessStatus = st
+                                                    processingStatusMessage = st
+                                                }
+                                            )
+                                            if (res.isSuccess) {
+                                                val proc = res.getOrThrow()
+                                                arabicExtractedPreview = proc.fullText
+                                                resultFile = proc.outputFile
+                                                resultMessage = "تم التحويل وحفظ النص والتشكيل بنجاح!" + if (proc.wasAiUsed) " (عبر الذكاء الاصطناعي OCR)" else ""
+                                                arabicProcessStatus = "تم التحويل بنجاح ✔"
+                                            } else {
+                                                val err = res.exceptionOrNull()?.localizedMessage ?: "حدث خطأ"
+                                                arabicProcessStatus = "خطأ: $err"
+                                                Toast.makeText(context, "خطأ: $err", Toast.LENGTH_LONG).show()
+                                            }
+                                            isProcessing = false
+                                        }
+                                    },
+                                    enabled = selectedUri != null && !isProcessing,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB))
+                                ) {
+                                    if (isProcessing) {
+                                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("جاري العمل...", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    } else {
+                                        Icon(Icons.Default.SyncAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("تحويل واستخراج النص والتشكيل", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+
+                            // 7. Status Message
+                            if (arabicProcessStatus.isNotBlank()) {
+                                item {
+                                    Text(
+                                        text = arabicProcessStatus,
+                                        fontSize = 12.sp,
+                                        color = if (arabicProcessStatus.startsWith("خطأ")) Color.Red else Color(0xFF0284C7),
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            }
+
+                            // 8. Extracted Textarea Preview & Action Buttons
+                            if (arabicExtractedPreview.isNotBlank()) {
+                                item {
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(14.dp),
+                                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
+                                    ) {
+                                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                    Icon(Icons.Default.FormatQuote, contentDescription = null, tint = theme.primaryColor)
+                                                    Text("معاينة النص والتشكيل المستخرج:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = theme.textColor)
+                                                }
+                                                Text("${arabicExtractedPreview.length} حرف", fontSize = 10.sp, color = Color.Gray)
+                                            }
+
+                                            OutlinedTextField(
+                                                value = arabicExtractedPreview,
+                                                onValueChange = { arabicExtractedPreview = it },
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(180.dp),
+                                                textStyle = androidx.compose.ui.text.TextStyle(
+                                                    fontSize = 14.sp,
+                                                    lineHeight = 22.sp
+                                                ),
+                                                shape = RoundedCornerShape(10.dp)
+                                            )
+
+                                            // Action Buttons: Copy, Share, Open Converted Document
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                OutlinedButton(
+                                                    onClick = {
+                                                        clipboardManager.setText(AnnotatedString(arabicExtractedPreview))
+                                                        Toast.makeText(context, "تم نسخ النص مع التشكيل إلى الحافظة ✔", Toast.LENGTH_SHORT).show()
+                                                    },
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    modifier = Modifier.weight(1f),
+                                                    contentPadding = PaddingValues(vertical = 6.dp)
+                                                ) {
+                                                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text("نسخ النص", fontSize = 11.sp)
+                                                }
+
+                                                if (resultFile != null) {
+                                                    Button(
+                                                        onClick = { shareFile(resultFile!!) },
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        modifier = Modifier.weight(1f),
+                                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                                        contentPadding = PaddingValues(vertical = 6.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(14.dp))
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text("مشاركة وتصدير", fontSize = 11.sp)
+                                                    }
+                                                }
+
+                                                if (onOpenConvertedDocument != null && resultFile != null) {
+                                                    Button(
+                                                        onClick = {
+                                                            onOpenConvertedDocument(Uri.fromFile(resultFile!!).toString(), resultFile!!.name)
+                                                            onDismiss()
+                                                        },
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        modifier = Modifier.weight(1f),
+                                                        colors = ButtonDefaults.buttonColors(containerColor = theme.primaryColor),
+                                                        contentPadding = PaddingValues(vertical = 6.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(14.dp))
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text("عرض الملف", fontSize = 11.sp)
+                                                    }
+                                                }
+                                            }
+
+                                            if (arabicTargetFormat == ArabicDocumentProcessor.TargetFormat.PDF) {
+                                                Text(
+                                                    text = "💡 عند ظهور نافذة المعاينة اختر «حفظ كـ PDF». كما يمكنك فتح ملف HTML وتصديره بخط Amiri.",
+                                                    fontSize = 10.sp,
+                                                    color = Color(0xFF64748B),
+                                                    lineHeight = 14.sp
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         "CONVERT" -> {
                             item {
                                 Text("تحويلات المستند المختار:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = theme.textColor)

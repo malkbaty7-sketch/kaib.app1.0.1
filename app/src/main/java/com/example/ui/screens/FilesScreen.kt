@@ -39,7 +39,8 @@ import java.util.*
 @Composable
 fun FilesScreen(
     viewModel: MainViewModel,
-    onNavigateToExtraction: () -> Unit
+    onNavigateToExtraction: () -> Unit,
+    onOpenDeviceDocuments: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val files by viewModel.allFiles.collectAsState()
@@ -67,8 +68,8 @@ fun FilesScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Top Header Card with 3D Elevation
         Card(
@@ -78,7 +79,7 @@ fun FilesScreen(
             shape = RoundedCornerShape(theme.cornerRadiusDp),
             colors = CardDefaults.cardColors(containerColor = theme.surfaceColor)
         ) {
-            Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -100,16 +101,39 @@ fun FilesScreen(
                         Column {
                             Text(
                                 text = "إدارة الملفات والمصادر",
-                                fontSize = 18.sp,
+                                fontSize = 17.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = theme.textColor
                             )
                             Text(
                                 text = "استيراد PDF و DOCX ونصوص للتحليل والاستخلاص",
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 color = theme.textColor.copy(alpha = 0.7f)
                             )
                         }
+                    }
+                }
+
+                // Quick access to Device Documents Manager
+                Surface(
+                    onClick = onOpenDeviceDocuments,
+                    shape = RoundedCornerShape(12.dp),
+                    color = theme.primaryColor.copy(alpha = 0.08f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, theme.primaryColor.copy(alpha = 0.25f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.FolderSpecial, contentDescription = null, tint = theme.primaryColor, modifier = Modifier.size(20.dp))
+                            Text("تصفح مدير مستندات الهاتف (PDF, Word, Excel) 📂", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = theme.primaryColor)
+                        }
+                        Icon(Icons.Default.ChevronLeft, contentDescription = null, tint = theme.primaryColor, modifier = Modifier.size(20.dp))
                     }
                 }
 
@@ -128,7 +152,9 @@ fun FilesScreen(
                                 )
                             )
                         },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = theme.primaryColor),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -139,7 +165,9 @@ fun FilesScreen(
 
                     OutlinedButton(
                         onClick = { showManualTextDialog = true },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -308,20 +336,21 @@ fun FileItemCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onViewContent() }
             .shadow(
-                if (isSelected) 6.dp else 2.dp,
+                if (isSelected) 4.dp else 1.dp,
                 RoundedCornerShape(14.dp),
                 spotColor = theme.shadowColor
             )
             .border(
                 width = if (isSelected) 2.dp else 1.dp,
-                color = if (isSelected) theme.primaryColor else Color.Black.copy(alpha = 0.05f),
+                color = if (isSelected) theme.primaryColor else Color.Black.copy(alpha = 0.06f),
                 shape = RoundedCornerShape(14.dp)
             ),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -367,42 +396,63 @@ fun FileItemCard(
                     )
                 }
 
-                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.DeleteOutline, contentDescription = "حذف", tint = Color.Red.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
+                // Delete button with 48dp touch target
+                IconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
+                    Icon(
+                        Icons.Default.DeleteOutline,
+                        contentDescription = "حذف",
+                        tint = Color(0xFFEF4444),
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 48.dp),
+                    .padding(start = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                val dateFormat = SimpleDateFormat("yyyy/MM/dd", Locale.getDefault())
                 Text(
                     text = "${file.wordCount} كلمة • ${(file.fileSize / 1024).coerceAtLeast(1)} KB",
                     fontSize = 11.sp,
                     color = Color.Gray
                 )
 
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    TextButton(
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Preview button (comfortable 36dp pill)
+                    Surface(
                         onClick = onViewContent,
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFF1F5F9),
+                        modifier = Modifier.height(36.dp)
                     ) {
-                        Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("معاينة", fontSize = 11.sp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp)
+                        ) {
+                            Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(15.dp), tint = Color(0xFF475569))
+                            Text("معاينة", fontSize = 11.sp, color = Color(0xFF475569))
+                        }
                     }
 
-                    TextButton(
+                    // Extract button (comfortable 36dp pill)
+                    Surface(
                         onClick = onExtractTopic,
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        color = theme.primaryColor.copy(alpha = 0.12f),
+                        modifier = Modifier.height(36.dp)
                     ) {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(14.dp), tint = theme.primaryColor)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("استخلاص", fontSize = 11.sp, color = theme.primaryColor, fontWeight = FontWeight.Bold)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp)
+                        ) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(15.dp), tint = theme.primaryColor)
+                            Text("استخلاص", fontSize = 11.sp, color = theme.primaryColor, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }

@@ -58,7 +58,7 @@ object OfflineDocumentConverter {
         // 1. Extract text from PDF
         val extractedText = extractTextFromPdf(context, uri)
         val paragraphs = if (extractedText.isNotBlank()) {
-            extractedText.split(Regex("""\n{2,}""")).filter { it.isNotBlank() }
+            ArabicDocumentProcessor.splitIntoParagraphs(extractedText, keepLines = false)
         } else {
             listOf("تم تحويل المستند: $baseName", "المحتوى فارغ أو صور فقط.")
         }
@@ -242,9 +242,21 @@ object OfflineDocumentConverter {
 
         try {
             for ((index, imgUri) in imageUris.withIndex()) {
-                val inputStream = context.contentResolver.openInputStream(imgUri) ?: continue
-                val bitmap = BitmapFactory.decodeStream(inputStream) ?: continue
-                inputStream.close()
+                val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                context.contentResolver.openInputStream(imgUri)?.use {
+                    BitmapFactory.decodeStream(it, null, boundsOptions)
+                }
+                var sampleSize = 1
+                while (boundsOptions.outWidth / sampleSize > 1600 || boundsOptions.outHeight / sampleSize > 1600) {
+                    sampleSize *= 2
+                }
+                val decodeOptions = BitmapFactory.Options().apply {
+                    inSampleSize = sampleSize
+                    inPreferredConfig = Bitmap.Config.RGB_565
+                }
+                val bitmap = context.contentResolver.openInputStream(imgUri)?.use {
+                    BitmapFactory.decodeStream(it, null, decodeOptions)
+                } ?: continue
 
                 // Standard A4 width/height in points: 595 x 842
                 val pageWidth = 595

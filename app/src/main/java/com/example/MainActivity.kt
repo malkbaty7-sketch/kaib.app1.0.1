@@ -63,6 +63,7 @@ class MainActivity : ComponentActivity() {
                 var showBrowserDialog by remember { mutableStateOf(false) }
                 var showSubscriptionDialog by remember { mutableStateOf(false) }
                 var showAnalyticsDialog by remember { mutableStateOf(false) }
+                var showArabicConverterStudio by remember { mutableStateOf(false) }
 
                 BackHandler(enabled = viewingDocUri != null || showDeviceDocsScreen || isEditingProject || currentTab != "PROJECTS") {
                     if (viewingDocUri != null) {
@@ -157,6 +158,11 @@ class MainActivity : ComponentActivity() {
                                         // Writing & Productivity Analytics Quick Access (Task 4.3)
                                         IconButton(onClick = { showAnalyticsDialog = true }) {
                                             Icon(Icons.Default.Insights, contentDescription = "إحصائيات وتحليلات الإنتاجية", tint = theme.primaryColor)
+                                        }
+
+                                        // Arabic Document Converter & Tashkeel Studio
+                                        IconButton(onClick = { showArabicConverterStudio = true }) {
+                                            Icon(Icons.Default.AutoFixHigh, contentDescription = "محوّل المستندات والتشكيل العربي", tint = theme.primaryColor)
                                         }
 
                                         // Research & PDF Browser Quick Access
@@ -280,7 +286,8 @@ class MainActivity : ComponentActivity() {
                                 when (currentTab) {
                                     "FILES" -> FilesScreen(
                                         viewModel = viewModel,
-                                        onNavigateToExtraction = { currentTab = "EXTRACTION" }
+                                        onNavigateToExtraction = { currentTab = "EXTRACTION" },
+                                        onOpenDeviceDocuments = { showDeviceDocsScreen = true }
                                     )
                                     "EXTRACTION" -> ExtractionScreen(
                                         viewModel = viewModel,
@@ -351,6 +358,18 @@ class MainActivity : ComponentActivity() {
                         theme = theme,
                         viewModel = viewModel,
                         onDismiss = { showAnalyticsDialog = false }
+                    )
+                }
+
+                if (showArabicConverterStudio) {
+                    com.example.ui.screens.DocumentToolsAndConverterDialog(
+                        theme = theme,
+                        onDismiss = { showArabicConverterStudio = false },
+                        onOpenConvertedDocument = { uriStr, docName ->
+                            showArabicConverterStudio = false
+                            viewingDocUri = uriStr
+                            viewingDocName = docName
+                        }
                     )
                 }
             }

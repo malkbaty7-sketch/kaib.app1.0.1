@@ -48,6 +48,7 @@ fun ExtractionScreen(
 
     var editingPassageIndex by remember { mutableStateOf<Int?>(null) }
     var editingPassageText by remember { mutableStateOf("") }
+    var showArabicConverterDialog by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier
@@ -55,6 +56,46 @@ fun ExtractionScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Arabic Document Converter & Tashkeel Banner
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showArabicConverterDialog = true }
+                    .shadow(theme.elevationDp, RoundedCornerShape(theme.cornerRadiusDp), spotColor = theme.shadowColor),
+                shape = RoundedCornerShape(theme.cornerRadiusDp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFF2563EB)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.SyncAlt, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                        }
+                        Column {
+                            Text("محوّل ومستخرج المستندات العربي (Tashkeel & OCR)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("استخراج ومعالجة PDF · DOCX · TXT · صور مع حفظ التشكيل بالكامل", color = Color(0xFF94A3B8), fontSize = 10.sp)
+                        }
+                    }
+                    Icon(Icons.Default.ArrowForwardIos, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(14.dp))
+                }
+            }
+        }
+
         // Top Header
         item {
             Card(
@@ -390,6 +431,13 @@ fun ExtractionScreen(
                 }
             }
         }
+    }
+
+    if (showArabicConverterDialog) {
+        DocumentToolsAndConverterDialog(
+            theme = theme,
+            onDismiss = { showArabicConverterDialog = false }
+        )
     }
 }
 
